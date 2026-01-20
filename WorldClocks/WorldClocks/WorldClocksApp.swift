@@ -3,7 +3,7 @@ import SwiftUI
 @main
 struct WorldClocksApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
-    
+
     var body: some Scene {
         Settings {
             EmptyView()
@@ -15,27 +15,27 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var statusItem: NSStatusItem?
     var popover: NSPopover?
     var timer: Timer?
-    
+
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Create status bar item
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        
+
         if let button = statusItem?.button {
             button.image = NSImage(systemSymbolName: "clock.fill", accessibilityDescription: "World Clocks")
             button.action = #selector(togglePopover)
             button.target = self
         }
-        
+
         // Create popover
         popover = NSPopover()
-        popover?.contentSize = NSSize(width: 400, height: 250)
+        popover?.contentSize = NSSize(width: 450, height: 400)
         popover?.behavior = .transient
         popover?.contentViewController = NSHostingController(rootView: ClockView())
-        
+
         // Hide dock icon
         NSApp.setActivationPolicy(.accessory)
     }
-    
+
     @objc func togglePopover() {
         if let button = statusItem?.button {
             if popover?.isShown == true {
@@ -48,44 +48,188 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
+struct TimeZone: Identifiable, Codable, Equatable {
+    let id: UUID
+    var name: String
+    var identifier: String
+
+    init(id: UUID = UUID(), name: String, identifier: String) {
+        self.id = id
+        self.name = name
+        self.identifier = identifier
+    }
+}
+
+class TimeZoneStore: ObservableObject {
+    @Published var timeZones: [TimeZone] {
+        didSet {
+            saveTimeZones()
+        }
+    }
+
+    private let key = "savedTimeZones"
+
+    init() {
+        if let data = UserDefaults.standard.data(forKey: key),
+           let decoded = try? JSONDecoder().decode([TimeZone].self, from: data) {
+            self.timeZones = decoded
+        } else {
+            self.timeZones = [
+                TimeZone(name: "CHILE", identifier: "America/Santiago"),
+                TimeZone(name: "PACIFIC", identifier: "America/Los_Angeles"),
+                TimeZone(name: "EAST COAST", identifier: "America/New_York")
+            ]
+        }
+    }
+
+    private func saveTimeZones() {
+        if let encoded = try? JSONEncoder().encode(timeZones) {
+            UserDefaults.standard.set(encoded, forKey: key)
+        }
+    }
+}
+
 struct ClockView: View {
+    @StateObject private var store = TimeZoneStore()
     @State private var currentTime = Date()
     @State private var showConverter = false
+    @State private var showAddTimezone = false
     @State private var selectedZone = "America/Santiago"
     @State private var inputHour = ""
     @State private var inputMinute = ""
+    @State private var searchText = ""
+    @State private var selectedTimezoneId = "America/Santiago"
 
     let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
-    let timeZones: [(name: String, identifier: String)] = [
-        ("CHILE", "America/Santiago"),
-        ("PACIFIC", "America/Los_Angeles"),
-        ("EAST COAST", "America/New_York")
+    let popularTimezones: [(name: String, identifier: String)] = [
+        ("Tokyo", "Asia/Tokyo"),
+        ("Hong Kong", "Asia/Hong_Kong"),
+        ("Singapore", "Asia/Singapore"),
+        ("Dubai", "Asia/Dubai"),
+        ("Moscow", "Europe/Moscow"),
+        ("London", "Europe/London"),
+        ("Paris", "Europe/Paris"),
+        ("Berlin", "Europe/Berlin"),
+        ("Madrid", "Europe/Madrid"),
+        ("New York", "America/New_York"),
+        ("Los Angeles", "America/Los_Angeles"),
+        ("Chicago", "America/Chicago"),
+        ("Mexico City", "America/Mexico_City"),
+        ("São Paulo", "America/Sao_Paulo"),
+        ("Buenos Aires", "America/Argentina/Buenos_Aires"),
+        ("Santiago", "America/Santiago"),
+        ("Sydney", "Australia/Sydney"),
+        ("Melbourne", "Australia/Melbourne"),
+        ("Auckland", "Pacific/Auckland")
     ]
+
+    var filteredTimezones: [(name: String, identifier: String)] {
+        if searchText.isEmpty {
+            return popularTimezones
+        }
+        return popularTimezones.filter {
+            $0.name.localizedCaseInsensitiveContains(searchText) ||
+            $0.identifier.localizedCaseInsensitiveContains(searchText)
+        }
+    }
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack(spacing: 30) {
-                ForEach(timeZones, id: \.identifier) { tz in
-                    VStack(spacing: 8) {
-                        Text(tz.name)
-                            .font(.system(size: 11, weight: .medium))
-                            .foregroundColor(.secondary)
-                            .tracking(2)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 30) {
+                    ForEach(store.timeZones) { tz in
+                        VStack(spacing: 8) {
+                            HStack(spacing: 4) {
+                                Text(tz.name)
+                                    .font(.system(size: 11, weight: .medium))
+                                    .foregroundColor(.secondary)
+                                    .tracking(2)
 
-                        Text(timeString(for: tz.identifier))
-                            .font(.system(size: 32, weight: .light, design: .default))
-                            .monospacedDigit()
+                                Button(action: {
+                                    store.timeZones.removeAll { $0.id == tz.id }
+                                }) {
+                                    Image(systemName: "xmark.circle.fill")
+                                        .font(.system(size: 10))
+                                        .foregroundColor(.secondary)
+                                }
+                                .buttonStyle(.plain)
+                                .opacity(0.6)
+                            }
 
-                        Text(dateString(for: tz.identifier))
-                            .font(.system(size: 11))
-                            .foregroundColor(.secondary)
+                            Text(timeString(for: tz.identifier))
+                                .font(.system(size: 32, weight: .light, design: .default))
+                                .monospacedDigit()
+                        }
                     }
+
+                    Button(action: {
+                        showAddTimezone.toggle()
+                    }) {
+                        VStack(spacing: 8) {
+                            Image(systemName: "plus.circle")
+                                .font(.system(size: 20))
+                                .foregroundColor(.secondary)
+
+                            Text("Add")
+                                .font(.system(size: 11, weight: .medium))
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    .buttonStyle(.plain)
+                    .padding(.horizontal, 10)
                 }
+                .padding(.horizontal, 30)
             }
-            .padding(30)
+            .padding(.vertical, 30)
             .onReceive(timer) { _ in
                 currentTime = Date()
+            }
+
+            if showAddTimezone {
+                VStack(spacing: 8) {
+                    TextField("Search timezone...", text: $searchText)
+                        .textFieldStyle(.roundedBorder)
+                        .frame(width: 250)
+                        .padding(.horizontal, 20)
+
+                    ScrollView {
+                        VStack(spacing: 4) {
+                            ForEach(filteredTimezones, id: \.identifier) { tz in
+                                Button(action: {
+                                    store.timeZones.append(TimeZone(name: tz.name.uppercased(), identifier: tz.identifier))
+                                    searchText = ""
+                                    showAddTimezone = false
+                                }) {
+                                    HStack {
+                                        Text(tz.name)
+                                            .font(.system(size: 12))
+                                            .foregroundColor(.primary)
+                                        Spacer()
+                                        Text(tz.identifier)
+                                            .font(.system(size: 10))
+                                            .foregroundColor(.secondary)
+                                    }
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 6)
+                                }
+                                .buttonStyle(.plain)
+                                .background(Color.gray.opacity(0.1))
+                                .cornerRadius(4)
+                            }
+                        }
+                        .padding(.horizontal, 20)
+                    }
+                    .frame(height: 150)
+
+                    Button("Cancel") {
+                        showAddTimezone = false
+                        searchText = ""
+                    }
+                    .buttonStyle(.bordered)
+                    .padding(.bottom, 8)
+                }
+                .padding(.bottom, 10)
             }
 
             Divider()
@@ -108,7 +252,7 @@ struct ClockView: View {
                     VStack(spacing: 10) {
                         HStack(spacing: 8) {
                             Picker("", selection: $selectedZone) {
-                                ForEach(timeZones, id: \.identifier) { tz in
+                                ForEach(store.timeZones) { tz in
                                     Text(tz.name).tag(tz.identifier)
                                 }
                             }
@@ -131,7 +275,7 @@ struct ClockView: View {
 
                         if let convertedDate = getConvertedDate() {
                             VStack(spacing: 6) {
-                                ForEach(timeZones, id: \.identifier) { tz in
+                                ForEach(store.timeZones) { tz in
                                     HStack {
                                         Text(tz.name)
                                             .font(.system(size: 10, weight: .medium))
@@ -155,23 +299,15 @@ struct ClockView: View {
 
     func timeString(for identifier: String, date: Date? = nil) -> String {
         let formatter = DateFormatter()
-        formatter.timeZone = TimeZone(identifier: identifier)
+        formatter.timeZone = Foundation.TimeZone(identifier: identifier)
         formatter.dateFormat = "HH:mm"
         return formatter.string(from: date ?? currentTime)
-    }
-
-    func dateString(for identifier: String) -> String {
-        let formatter = DateFormatter()
-        formatter.timeZone = TimeZone(identifier: identifier)
-        formatter.locale = Locale(identifier: "es_CL")
-        formatter.dateFormat = "EEE, d MMM"
-        return formatter.string(from: currentTime).lowercased()
     }
 
     func getConvertedDate() -> Date? {
         guard let hour = Int(inputHour), let minute = Int(inputMinute),
               hour >= 0, hour < 24, minute >= 0, minute < 60,
-              let timeZone = TimeZone(identifier: selectedZone) else {
+              let timeZone = Foundation.TimeZone(identifier: selectedZone) else {
             return nil
         }
 
