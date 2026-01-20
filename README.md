@@ -2,6 +2,10 @@
 
 Una aplicación minimalista para la barra de menú de macOS que muestra la hora en tiempo real para Chile, Pacific (US West Coast) y East Coast (US East Coast).
 
+<img width="436" height="342" alt="image" src="https://github.com/user-attachments/assets/b9ffd319-09e9-4fc7-8fb9-8c84bdd59016" />
+
+
+
 ## Características
 
 - 🕐 Muestra 3 zonas horarias simultáneamente (Chile, Pacific, East Coast)
