@@ -13,7 +13,18 @@ Una aplicación minimalista para la barra de menú de macOS que muestra la hora 
 
 ## Instalación
 
-### Opción 1: Compilar con Xcode (Recomendado)
+### Opción 1: Descargar App Compilada (Más Fácil)
+
+1. Descarga `WorldClocks.zip` desde el repositorio
+2. Descomprime el archivo (doble clic)
+3. Arrastra `WorldClocks.app` a tu carpeta Aplicaciones
+4. Abre WorldClocks desde Aplicaciones
+5. Si macOS te pide permiso de seguridad:
+   - Ve a Preferencias del Sistema → Privacidad y Seguridad
+   - Haz clic en "Abrir de todas formas"
+6. La app aparecerá en tu barra de menú con un icono de reloj 🕐
+
+### Opción 2: Compilar con Xcode (Para Desarrolladores)
 
 1. Descarga y descomprime el proyecto
 2. Abre `WorldClocks.xcodeproj` en Xcode
@@ -21,11 +32,12 @@ Una aplicación minimalista para la barra de menú de macOS que muestra la hora 
 4. Presiona ⌘+R para compilar y ejecutar
 5. La app aparecerá en tu barra de menú con un icono de reloj 🕐
 
-### Opción 2: Compilar desde Terminal
+### Opción 3: Compilar desde Terminal
 
 ```bash
 cd WorldClocks
 xcodebuild -project WorldClocks.xcodeproj -scheme WorldClocks -configuration Release build
+cp -R ~/Library/Developer/Xcode/DerivedData/WorldClocks-*/Build/Products/Release/WorldClocks.app /Applications/
 ```
 
 ## Uso
@@ -39,7 +51,7 @@ xcodebuild -project WorldClocks.xcodeproj -scheme WorldClocks -configuration Rel
 1. Haz clic en el botón "Time Converter" en la parte inferior del popover
 2. Selecciona la zona horaria de referencia (Chile, Pacific, o East Coast)
 3. Ingresa la hora que deseas convertir (formato HH:MM)
-4. Haz clic en "Convert" para ver el equivalente en todas las zonas horarias
+4. La conversión se hace automáticamente mientras escribes
 
 **Ejemplo:** Si ingresas 14:00 en Chile, verás automáticamente qué hora es en Pacific y East Coast.
 
