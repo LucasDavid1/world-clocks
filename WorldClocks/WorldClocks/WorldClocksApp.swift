@@ -52,11 +52,15 @@ struct TimeZone: Identifiable, Codable, Equatable {
     let id: UUID
     var name: String
     var identifier: String
+    var isCustomGMT: Bool = false
+    var gmtOffset: Int? = nil
 
-    init(id: UUID = UUID(), name: String, identifier: String) {
+    init(id: UUID = UUID(), name: String, identifier: String, isCustomGMT: Bool = false, gmtOffset: Int? = nil) {
         self.id = id
         self.name = name
         self.identifier = identifier
+        self.isCustomGMT = isCustomGMT
+        self.gmtOffset = gmtOffset
     }
 }
 
@@ -99,6 +103,9 @@ struct ClockView: View {
     @State private var inputMinute = ""
     @State private var searchText = ""
     @State private var selectedTimezoneId = "America/Santiago"
+    @State private var customGMTOffset = "0"
+    @State private var customTimezoneName = ""
+    @State private var showCustomGMT = false
 
     let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
 
@@ -157,7 +164,7 @@ struct ClockView: View {
                                 .opacity(0.6)
                             }
 
-                            Text(timeString(for: tz.identifier))
+                            Text(timeString(for: tz))
                                 .font(.system(size: 32, weight: .light, design: .default))
                                 .monospacedDigit()
                         }
@@ -188,43 +195,110 @@ struct ClockView: View {
 
             if showAddTimezone {
                 VStack(spacing: 8) {
-                    TextField("Search timezone...", text: $searchText)
-                        .textFieldStyle(.roundedBorder)
-                        .frame(width: 250)
-                        .padding(.horizontal, 20)
+                    HStack(spacing: 12) {
+                        Button(action: {
+                            showCustomGMT = false
+                        }) {
+                            Text("Cities")
+                                .font(.system(size: 11, weight: showCustomGMT ? .regular : .semibold))
+                                .foregroundColor(showCustomGMT ? .secondary : .primary)
+                        }
+                        .buttonStyle(.plain)
 
-                    ScrollView {
-                        VStack(spacing: 4) {
-                            ForEach(filteredTimezones, id: \.identifier) { tz in
-                                Button(action: {
-                                    store.timeZones.append(TimeZone(name: tz.name.uppercased(), identifier: tz.identifier))
-                                    searchText = ""
-                                    showAddTimezone = false
-                                }) {
-                                    HStack {
-                                        Text(tz.name)
-                                            .font(.system(size: 12))
-                                            .foregroundColor(.primary)
-                                        Spacer()
-                                        Text(tz.identifier)
-                                            .font(.system(size: 10))
-                                            .foregroundColor(.secondary)
+                        Button(action: {
+                            showCustomGMT = true
+                        }) {
+                            Text("Custom GMT")
+                                .font(.system(size: 11, weight: showCustomGMT ? .semibold : .regular))
+                                .foregroundColor(showCustomGMT ? .primary : .secondary)
+                        }
+                        .buttonStyle(.plain)
+                    }
+                    .padding(.horizontal, 20)
+
+                    if !showCustomGMT {
+                        TextField("Search timezone...", text: $searchText)
+                            .textFieldStyle(.roundedBorder)
+                            .frame(width: 250)
+                            .padding(.horizontal, 20)
+
+                        ScrollView {
+                            VStack(spacing: 4) {
+                                ForEach(filteredTimezones, id: \.identifier) { tz in
+                                    Button(action: {
+                                        store.timeZones.append(TimeZone(name: tz.name.uppercased(), identifier: tz.identifier))
+                                        searchText = ""
+                                        showAddTimezone = false
+                                    }) {
+                                        HStack {
+                                            Text(tz.name)
+                                                .font(.system(size: 12))
+                                                .foregroundColor(.primary)
+                                            Spacer()
+                                            Text(tz.identifier)
+                                                .font(.system(size: 10))
+                                                .foregroundColor(.secondary)
+                                        }
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 6)
                                     }
-                                    .padding(.horizontal, 12)
-                                    .padding(.vertical, 6)
+                                    .buttonStyle(.plain)
+                                    .background(Color.gray.opacity(0.1))
+                                    .cornerRadius(4)
                                 }
-                                .buttonStyle(.plain)
-                                .background(Color.gray.opacity(0.1))
-                                .cornerRadius(4)
                             }
+                            .padding(.horizontal, 20)
+                        }
+                        .frame(height: 150)
+                    } else {
+                        VStack(spacing: 12) {
+                            TextField("Custom Name (e.g., MY TIME)", text: $customTimezoneName)
+                                .textFieldStyle(.roundedBorder)
+                                .frame(width: 250)
+
+                            HStack(spacing: 8) {
+                                Text("GMT")
+                                    .font(.system(size: 12, weight: .medium))
+
+                                TextField("0", text: $customGMTOffset)
+                                    .textFieldStyle(.roundedBorder)
+                                    .frame(width: 60)
+                                    .multilineTextAlignment(.center)
+
+                                Text("(e.g., 0, +1, -4, +5.5)")
+                                    .font(.system(size: 9))
+                                    .foregroundColor(.secondary)
+                            }
+
+                            Button("Add Custom Timezone") {
+                                if let offset = Double(customGMTOffset.replacingOccurrences(of: "+", with: "")),
+                                   !customTimezoneName.isEmpty {
+                                    let offsetSeconds = Int(offset * 3600)
+                                    let identifier = "GMT\(customGMTOffset.hasPrefix("+") || customGMTOffset.hasPrefix("-") ? "" : "+")\(customGMTOffset)"
+                                    store.timeZones.append(TimeZone(
+                                        name: customTimezoneName.uppercased(),
+                                        identifier: identifier,
+                                        isCustomGMT: true,
+                                        gmtOffset: offsetSeconds
+                                    ))
+                                    customTimezoneName = ""
+                                    customGMTOffset = "0"
+                                    showAddTimezone = false
+                                }
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .disabled(customTimezoneName.isEmpty || customGMTOffset.isEmpty)
                         }
                         .padding(.horizontal, 20)
+                        .frame(height: 150)
                     }
-                    .frame(height: 150)
 
                     Button("Cancel") {
                         showAddTimezone = false
                         searchText = ""
+                        customTimezoneName = ""
+                        customGMTOffset = "0"
+                        showCustomGMT = false
                     }
                     .buttonStyle(.bordered)
                     .padding(.bottom, 8)
@@ -281,7 +355,7 @@ struct ClockView: View {
                                             .font(.system(size: 10, weight: .medium))
                                             .foregroundColor(.secondary)
                                             .frame(width: 80, alignment: .leading)
-                                        Text(timeString(for: tz.identifier, date: convertedDate))
+                                        Text(timeString(for: tz, date: convertedDate))
                                             .font(.system(size: 14, weight: .medium))
                                             .monospacedDigit()
                                     }
@@ -295,6 +369,19 @@ struct ClockView: View {
             }
             .padding(.bottom, 12)
         }
+    }
+
+    func timeString(for timezone: TimeZone, date: Date? = nil) -> String {
+        let formatter = DateFormatter()
+
+        if timezone.isCustomGMT, let offset = timezone.gmtOffset {
+            formatter.timeZone = Foundation.TimeZone(secondsFromGMT: offset)
+        } else {
+            formatter.timeZone = Foundation.TimeZone(identifier: timezone.identifier)
+        }
+
+        formatter.dateFormat = "HH:mm"
+        return formatter.string(from: date ?? currentTime)
     }
 
     func timeString(for identifier: String, date: Date? = nil) -> String {
